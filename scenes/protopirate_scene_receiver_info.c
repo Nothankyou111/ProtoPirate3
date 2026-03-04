@@ -93,7 +93,6 @@ static void protopirate_receiver_info_build_normal_widget(ProtoPirateApp* app) {
             if(furi_string_cmp_str(protocol, "PSA") == 0) is_psa = true;
             if(furi_string_cmp_str(protocol, "Scher-Khan") == 0) is_emu_off = true;
             else if(furi_string_cmp_str(protocol, "Kia V5") == 0) is_emu_off = true;
-            else if(furi_string_cmp_str(protocol, "Kia V6") == 0) is_emu_off = true;
             else is_emu_off = false;
         }
         furi_string_free(protocol);
