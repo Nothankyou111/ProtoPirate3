@@ -6,7 +6,6 @@
 #include "helpers/protopirate_settings.h"
 #include "scenes/protopirate_scene.h"
 #include "views/protopirate_receiver.h"
-#include "views/protopirate_receiver_info.h"
 #include "protopirate_history.h"
 #include "helpers/radio_device_loader.h"
 
@@ -24,9 +23,14 @@
 #include <lib/subghz/transmitter.h>
 #include <lib/subghz/devices/devices.h>
 #include <lib/subghz/subghz_file_encoder_worker.h>
+#include <lib/flipper_application/plugins/plugin_manager.h>
+#include <lib/flipper_application/plugins/composite_resolver.h>
 #include <dialogs/dialogs.h>
 #include "defines.h"
+#include "protocols/protocols_common.h"
 #include "protocols/psa.h"
+#include "protocols/protocol_items.h"
+#include "protocols/protopirate_protocol_plugins.h"
 
 #define PROTOPIRATE_KEYSTORE_DIR_NAME APP_ASSETS_PATH("encrypted")
 
@@ -38,12 +42,15 @@ typedef struct {
     SubGhzReceiver* receiver;
     SubGhzRadioPreset* preset;
     const SubGhzProtocolRegistry* protocol_registry;
+    CompositeApiResolver* plugin_resolver;
+    PluginManager* protocol_plugin_manager;
+    const ProtoPirateProtocolPlugin* protocol_plugin;
+    ProtoPirateProtocolRegistryFilter protocol_registry_filter;
     ProtoPirateHistory* history;
     const SubGhzDevice* radio_device;
     ProtoPirateTxRxState txrx_state;
     ProtoPirateHopperState hopper_state;
     ProtoPirateRxKeyState rx_key_state;
-    bool rx_low_memory_hold;
     uint8_t hopper_idx_frequency;
     uint8_t hopper_timeout;
     uint16_t idx_menu_chosen;
@@ -62,7 +69,6 @@ struct ProtoPirateApp {
     View* view_about;
     FuriString* file_path;
     ProtoPirateReceiver* protopirate_receiver;
-    ProtoPirateReceiverInfo* protopirate_receiver_info;
     ProtoPirateTxRx* txrx;
     SubGhzSetting* setting;
     ProtoPirateLock lock;
@@ -78,7 +84,12 @@ struct ProtoPirateApp {
     FuriString* save_protocol;
     uint16_t save_history_idx;
     bool save_from_saved_info;
+    bool emulate_disabled_for_loaded;
 };
+
+#ifdef ENABLE_EMULATE_FEATURE
+void protopirate_emulate_context_release(ProtoPirateApp* app);
+#endif
 
 typedef enum {
     ProtoPirateSetTypeFord_v0,
@@ -91,8 +102,6 @@ void protopirate_preset_init(
     uint32_t frequency,
     uint8_t* preset_data,
     size_t preset_data_size);
-
-const char* preset_name_to_short(const char* preset_name);
 
 void protopirate_get_frequency_modulation(
     ProtoPirateApp* app,
@@ -116,8 +125,19 @@ void protopirate_tx_stop(ProtoPirateApp* app);
 bool protopirate_radio_init(ProtoPirateApp* app);
 void protopirate_radio_deinit(ProtoPirateApp* app);
 bool protopirate_refresh_protocol_registry(ProtoPirateApp* app, bool ensure_receiver_ready);
+bool protopirate_apply_protocol_registry_for_preset_data(
+    ProtoPirateApp* app,
+    const uint8_t* preset_data,
+    size_t preset_data_size);
+bool protopirate_ensure_variable_item_list(ProtoPirateApp* app);
+bool protopirate_ensure_widget(ProtoPirateApp* app);
+bool protopirate_ensure_text_input(ProtoPirateApp* app);
+bool protopirate_ensure_view_about(ProtoPirateApp* app);
+bool protopirate_ensure_receiver_view(ProtoPirateApp* app);
+void protopirate_release_shared_radio_state(ProtoPirateApp* app);
 
 void protopirate_rx_stack_suspend_for_tx(ProtoPirateApp* app);
+
 void protopirate_rx_stack_resume_after_tx(ProtoPirateApp* app);
 
 void protopirate_app_free(ProtoPirateApp* app);
